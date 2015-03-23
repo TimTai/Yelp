@@ -1,0 +1,95 @@
+<?php
+include("/Users/lapy110/Desktop/Yelp/Crawler/lib/LIB_http.php");
+include("/Users/lapy110/Desktop/Yelp/Crawler/lib/LIB_parse.php");
+
+//$webpages = http_get("http://www.yelp.com/biz/shake-shack-new-york-9","");
+//$webpages = http_get("http://www.yahoo.com","");
+function curlGet($url) {
+	$ch = curl_init(); // Initialising cURL session
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
+	curl_setopt($ch, CURLOPT_URL, $url);
+	$results = curl_exec($ch); // Executing cURL session
+	curl_close($ch); // Closing cURL session
+	return $results; 
+}
+
+function refine_info($input, $webpage)
+{
+	if($input == "rate")
+	{
+		$rate = parse_array($webpage,'<meta itemprop="ratingValue" content="','">');
+		for($i=0; $i<sizeof($rate) ; $i++)
+		{
+			$rate2[$i] = return_between($rate[$i], '<meta itemprop="ratingValue" content="', '">', EXCL);
+		}
+		return $rate2;
+	}
+	else if($input == "date")
+	{
+		$date = parse_array($webpage,'<meta itemprop="datePublished" content="','">');
+		for($i=0; $i<sizeof($date) ; $i++)
+		{
+			$date2[$i] = return_between($date[$i], '<meta itemprop="datePublished" content="', '">', EXCL);
+		}
+		return $date2;
+	}
+	else
+		echo "ERROR";
+}
+
+function dowloadreview($url)
+{
+	echo "Name: ".substr($url, 4);
+	$webpage = curlGet('http://www.yelp.com/'."$url");
+	$R_count = parse_array($webpage,'<span class="count" data-lang="en">','</span>');
+	//echo $R_count[0];
+	$reviewcount = strip_tags($R_count[0]);
+	$pages = ceil(($reviewcount / 40 ) ); //40 reviews per page
+	echo "$pages"."\n";
+	echo $reviewcount."\n";
+
+	$fp = fopen("review2.txt", 'w');
+	fwrite($fp,"Name: ".substr($url, 4)."\n");
+	$p=0; //pages number
+	$r=1; //reviews count
+	for($i=0; $i<($reviewcount+1); $i+=40)
+	{
+		$webpage = curlGet('http://www.yelp.com/'."$url".'?start='."$i");
+		//echo $webpage;
+		$reviews = parse_array($webpage,'<p itemprop="description" lang="en">','</p>');
+		//$rate = parse_array($webpage,'<meta itemprop="ratingValue" content="','">');
+
+		$rate2 = refine_info("rate", $webpage);  //parse and refine date/rating
+		$date2 = refine_info("date", $webpage);  //parse and refine date/rating
+		
+
+		fwrite($fp,"Page="."$p"."\n");
+		$p++;
+		for($x =0; $x<sizeof($reviews); $x++)
+		{
+			echo "writing review:"."$r".' ';
+			fwrite($fp,"Review="."$r".' ');
+			$r++;
+			//fwrite($fp, "Rate:"."strip_tags($rate[$x])"."  ");
+			fwrite($fp, "Rate:".$rate2[$x].'  ');
+			echo "Rate:".$rate2[$x].'  ';
+			fwrite($fp, "Date:".$date2[$x]."\n");
+			echo "Date:".$date2[$x]."\n";
+			fwrite($fp,strip_tags($reviews[$x])."\n\n");
+		}
+		sleep(4);
+		echo "sleep...\n";
+	}
+	fclose($fp);
+}
+
+
+dowloadreview('biz/la-cigogne-brooklyn');
+
+
+
+
+
+	
+?>
